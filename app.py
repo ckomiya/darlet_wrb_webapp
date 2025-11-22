@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
 import altair as alt
 from datetime import datetime, timedelta
+import json
 
 # ==========================================
 # CONFIGURACIÓN GENERAL DE LA APP
@@ -11,13 +12,10 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="Dashboard Ventas", layout="wide")
 
 # ==========================================
-# 0) AUTENTICACIÓN SIMPLE
+# 0) AUTENTICACIÓN SIMPLE CON SECRETO
 # ==========================================
-
-USERS = {
-    "darlet": "space2000!",
-    "wirbi": "space2000!"
-}
+USERS = ["darlet", "wirbi"]
+PASSWORD = st.secrets["APP_PASSWORD"]  # ✅ contraseña segura en secrets.toml
 
 def login_screen():
     st.title("🔐 Inicio de Sesión")
@@ -27,7 +25,7 @@ def login_screen():
     pwd = st.text_input("Contraseña", type="password")
 
     if st.button("Ingresar"):
-        if user in USERS and USERS[user] == pwd:
+        if user in USERS and pwd == PASSWORD:
             st.session_state["logged_in"] = True
             st.session_state["user"] = user
             st.success("Ingreso exitoso 🎉")
@@ -35,52 +33,37 @@ def login_screen():
         else:
             st.error("Usuario o contraseña incorrectos")
 
-# Si NO está logueado → mostrar pantalla de login
 if "logged_in" not in st.session_state or st.session_state["logged_in"] is False:
     login_screen()
     st.stop()
 
 # ==========================================
-# 1) CARGA DE DATOS DESDE GOOGLE SHEETS USANDO SECRETS
+# 1) CARGA DE DATOS — DETECTAR AÑO ACTUAL
 # ==========================================
 @st.cache_data(ttl=300)
 def load_data():
-
-    # Scopes necesarios
-    scopes = [
+    scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive.file",
-        "https://www.googleapis.com/auth/drive"
+        "https://www.googleapis.com/auth/drive",
     ]
 
-    # Credenciales tomadas desde secrets
-    credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
+    # ✅ Usar service account desde secrets
+    sa_info = st.secrets["SERVICE_ACCOUNT"]  # JSON como diccionario
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(sa_info, scope)
+    client = gspread.authorize(creds)
 
-    # Cliente autorizado
-    client = gspread.authorize(credentials)
-
-    # Abrir Google Sheet
     sh = client.open("pedidos_darla")
-
-    # Detectar el año actual
     current_year = str(datetime.now().year)
     ws = sh.worksheet(current_year)
 
-    # Cargar datos
     data = ws.get_all_records()
     df = pd.DataFrame(data)
-
-    # Convertir fechas (sin hora)
-    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce", dayfirst=True).dt.normalize()
-
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce', dayfirst=True).dt.normalize()
     return df
 
 df = load_data()
-
 st.title("📊 Dashboard de Ventas")
 
 # ==========================================
@@ -88,14 +71,8 @@ st.title("📊 Dashboard de Ventas")
 # ==========================================
 menu = st.sidebar.radio(
     "📌 Selecciona una vista",
-    [
-        "🏠 Dashboard General",
-        "👥 Clientes",
-        "📦 Productos",
-        "🧾 Ventas"
-    ]
+    ["🏠 Dashboard General", "👥 Clientes", "📦 Productos", "🧾 Ventas"]
 )
-
 st.sidebar.markdown("---")
 st.sidebar.write(f"👤 Usuario: **{st.session_state['user']}**")
 
@@ -103,85 +80,56 @@ st.sidebar.write(f"👤 Usuario: **{st.session_state['user']}**")
 # 3) FILTRO GLOBAL DE FECHAS
 # ==========================================
 st.sidebar.markdown("### 🔍 Filtros globales")
-
 today = datetime.now().date()
 week_ago = today - timedelta(days=7)
-
 min_date_db = df["Fecha"].min().date()
 max_date_db = df["Fecha"].max().date()
-
 default_start = max(min_date_db, week_ago)
 default_end = today
 
-date_range = st.sidebar.date_input(
-    "Rango de fechas",
-    [default_start, default_end]
-)
-
+date_range = st.sidebar.date_input("Rango de fechas", [default_start, default_end])
 if not isinstance(date_range, (list, tuple)) or len(date_range) != 2:
     st.sidebar.error("Selecciona un rango válido.")
     df_filtrado = df.iloc[0:0]
 else:
-    start_date = pd.to_datetime(date_range[0]).date()
-    end_date = pd.to_datetime(date_range[1]).date()
-
+    start_date, end_date = pd.to_datetime(date_range[0]).date(), pd.to_datetime(date_range[1]).date()
     if start_date > end_date:
         st.sidebar.error("La fecha inicial no puede ser mayor.")
         df_filtrado = df.iloc[0:0]
     else:
-        df_filtrado = df[
-            (df["Fecha"].dt.date >= start_date) &
-            (df["Fecha"].dt.date <= end_date)
-        ]
+        df_filtrado = df[(df["Fecha"].dt.date >= start_date) & (df["Fecha"].dt.date <= end_date)]
 
 def show_df_without_time(df_to_show):
-    if "Fecha" in df_to_show.columns:
-        tmp = df_to_show.copy()
+    tmp = df_to_show.copy()
+    if "Fecha" in tmp.columns:
         tmp["Fecha"] = tmp["Fecha"].dt.date
-        st.dataframe(tmp)
-    else:
-        st.dataframe(df_to_show)
+    st.dataframe(tmp)
 
 # ================================
-# 4) Dashboard General
+# 4) DASHBOARD GENERAL
 # ================================
 if menu == "🏠 Dashboard General":
     st.subheader("🏠 Dashboard General")
-
     if df_filtrado.empty:
         st.warning("No hay datos para el rango seleccionado.")
     else:
         col1, col2 = st.columns(2)
-
-        # 1. Ventas por cliente
         with col1:
             st.markdown("### 💰 Ventas por Cliente")
             df_cliente = df_filtrado.groupby("Cliente", as_index=False)["Total"].sum()
-
-            chart = (
-                alt.Chart(df_cliente)
-                .mark_bar()
-                .encode(
-                    x=alt.X("Cliente:N", sort="-y"),
-                    y="Total:Q",
-                    tooltip=["Cliente", "Total"]
-                )
+            chart = alt.Chart(df_cliente).mark_bar().encode(
+                x=alt.X("Cliente:N", sort="-y"),
+                y="Total:Q",
+                tooltip=["Cliente", "Total"]
             )
             st.altair_chart(chart, use_container_width=True)
-
-        # 2. Productos más vendidos (rosado)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
             df_prod = df_filtrado.groupby("Producto", as_index=False)["Cantidad"].sum()
-
-            chart2 = (
-                alt.Chart(df_prod)
-                .mark_bar(color="#ff6fbf")   # rosado
-                .encode(
-                    x=alt.X("Producto:N", sort="-y"),
-                    y="Cantidad:Q",
-                    tooltip=["Producto", "Cantidad"]
-                )
+            chart2 = alt.Chart(df_prod).mark_bar(color="#ff6fbf").encode(
+                x=alt.X("Producto:N", sort="-y"),
+                y="Cantidad:Q",
+                tooltip=["Producto", "Cantidad"]
             )
             st.altair_chart(chart2, use_container_width=True)
 
@@ -190,26 +138,20 @@ if menu == "🏠 Dashboard General":
 # ================================
 elif menu == "👥 Clientes":
     st.subheader("👥 Análisis por Cliente")
-
     clientes = sorted(df["Cliente"].dropna().unique())
     cliente_sel = st.selectbox("Selecciona un cliente", ["- Todos -"] + clientes)
-
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
         df_c = df_filtrado if cliente_sel == "- Todos -" else df_filtrado[df_filtrado["Cliente"] == cliente_sel]
-
         st.metric("Total consumido", f"S/ {df_c['Total'].sum():.2f}")
-
         df_prod = df_c.groupby("Producto", as_index=False)["Cantidad"].sum()
-
         chart = alt.Chart(df_prod).mark_bar(color="#80c683").encode(
             x=alt.X("Producto:N", sort="-y"),
             y="Cantidad:Q",
             tooltip=["Producto", "Cantidad"]
         )
         st.altair_chart(chart, use_container_width=True)
-
         st.markdown("### 📋 Detalle")
         show_df_without_time(df_c)
 
@@ -218,24 +160,19 @@ elif menu == "👥 Clientes":
 # ================================
 elif menu == "📦 Productos":
     st.subheader("📦 Análisis por Producto")
-
     productos = sorted(df["Producto"].dropna().unique())
     producto_sel = st.selectbox("Producto", ["- Todos -"] + productos)
-
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
         df_p = df_filtrado if producto_sel == "- Todos -" else df_filtrado[df_filtrado["Producto"] == producto_sel]
-
         st.metric("Total vendido", int(df_p["Cantidad"].sum()))
-
         chart = alt.Chart(df_p).mark_line(point=True, color="#8e59ff").encode(
             x=alt.X("Fecha:T", axis=alt.Axis(format="%Y-%m-%d")),
             y="Cantidad:Q",
             tooltip=["Fecha", "Cantidad"]
         )
         st.altair_chart(chart, use_container_width=True)
-
         show_df_without_time(df_p)
 
 # ================================
