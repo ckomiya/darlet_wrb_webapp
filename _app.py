@@ -141,7 +141,7 @@ if menu == "🏠 Dashboard General":
     else:
         col1, col2 = st.columns(2)
 
-        # 1. Ventas por cliente
+        # 1. Ventas por cliente (ejes invertidos)
         with col1:
             st.markdown("### 💰 Ventas por Cliente")
             df_cliente = df_filtrado.groupby("Cliente", as_index=False)["Total"].sum()
@@ -150,14 +150,14 @@ if menu == "🏠 Dashboard General":
                 alt.Chart(df_cliente)
                 .mark_bar()
                 .encode(
-                    x=alt.X("Cliente:N", sort="-y"),
-                    y="Total:Q",
+                    y=alt.Y("Cliente:N", sort="-x"),  # eje vertical nominal
+                    x="Total:Q",                      # eje horizontal cuantitativo
                     tooltip=["Cliente", "Total"]
                 )
             )
             st.altair_chart(chart, use_container_width=True)
 
-        # 2. Productos más vendidos (rosado)
+        # 2. Productos más vendidos (rosado, ejes invertidos)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
             df_prod = df_filtrado.groupby("Producto", as_index=False)["Cantidad"].sum()
@@ -166,12 +166,13 @@ if menu == "🏠 Dashboard General":
                 alt.Chart(df_prod)
                 .mark_bar(color="#ff6fbf")   # rosado
                 .encode(
-                    x=alt.X("Producto:N", sort="-y"),
-                    y="Cantidad:Q",
+                    y=alt.Y("Producto:N", sort="-x"),  # eje vertical nominal
+                    x="Cantidad:Q",                     # eje horizontal cuantitativo
                     tooltip=["Producto", "Cantidad"]
                 )
             )
             st.altair_chart(chart2, use_container_width=True)
+
 
 # ================================
 # 5) CLIENTES
