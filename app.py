@@ -114,6 +114,10 @@ if menu == "🏠 Dashboard General":
     if df_filtrado.empty:
         st.warning("No hay datos para el rango seleccionado.")
     else:
+        # Mostrar total consumido
+        total_consumido = df_filtrado["Total"].sum()
+        st.metric("💰 Total consumido", f"S/ {total_consumido:.2f}")
+
         col1, col2 = st.columns(2)
 
         # 1. Ventas por cliente (ejes invertidos)
@@ -135,15 +139,15 @@ if menu == "🏠 Dashboard General":
         # 2. Productos más vendidos (rosado, ejes invertidos)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
-            df_prod = df_filtrado.groupby("Producto", as_index=False)["Cantidad"].sum()
+            df_prod = df_filtrado.groupby("Producto", as_index=False)["Total"].sum()  # usar Total
 
             chart2 = (
                 alt.Chart(df_prod)
                 .mark_bar(color="#ff6fbf")   # rosado
                 .encode(
                     y=alt.Y("Producto:N", sort="-x"),  # eje vertical nominal
-                    x="Cantidad:Q",                     # eje horizontal cuantitativo
-                    tooltip=["Producto", "Cantidad"]
+                    x="Total:Q",                        # eje horizontal cuantitativo
+                    tooltip=["Producto", "Total"]
                 )
             )
             st.altair_chart(chart2, use_container_width=True)
