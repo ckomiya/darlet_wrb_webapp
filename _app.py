@@ -179,23 +179,22 @@ if menu == "🏠 Dashboard General":
 # ================================
 elif menu == "👥 Clientes":
     st.subheader("👥 Análisis por Cliente")
-
     clientes = sorted(df["Cliente"].dropna().unique())
     cliente_sel = st.selectbox("Selecciona un cliente", ["- Todos -"] + clientes)
-
+    
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
         df_c = df_filtrado if cliente_sel == "- Todos -" else df_filtrado[df_filtrado["Cliente"] == cliente_sel]
-
         st.metric("Total consumido", f"S/ {df_c['Total'].sum():.2f}")
 
-        df_prod = df_c.groupby("Producto", as_index=False)["Cantidad"].sum()
+        # Agrupar por Producto y sumar Total
+        df_prod = df_c.groupby("Producto", as_index=False)["Total"].sum()
 
         chart = alt.Chart(df_prod).mark_bar(color="#80c683").encode(
-            x=alt.X("Producto:N", sort="-y"),
-            y="Cantidad:Q",
-            tooltip=["Producto", "Cantidad"]
+            y=alt.Y("Producto:N", sort="-x"),  # categorías en Y
+            x="Total:Q",                        # ahora valores en X = Total
+            tooltip=["Producto", "Total"]
         )
         st.altair_chart(chart, use_container_width=True)
 
