@@ -202,21 +202,38 @@ elif menu == "👥 Clientes":
         show_df_without_time(df_c)
 
 # ================================
-# 6) PRODUCTOS
+# 6) PRODUCTOS (con 2 dropdown relacionados)
 # ================================
 elif menu == "📦 Productos":
     st.subheader("📦 Análisis por Producto")
 
-    productos = sorted(df["Producto"].dropna().unique())
-    producto_sel = st.selectbox("Producto", ["- Todos -"] + productos)
-
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
-        df_p = df_filtrado if producto_sel == "- Todos -" else df_filtrado[df_filtrado["Producto"] == producto_sel]
+        # 🟢 Crear lista de categorías únicas de la pestaña filtrada
+        categorias = sorted(df_filtrado["Categoría"].dropna().unique())
+        categoria_sel = st.selectbox("Categoría", ["- Todas -"] + categorias)
 
+        # Filtrar productos según la categoría seleccionada
+        if categoria_sel == "- Todas -":
+            df_categoria = df_filtrado
+        else:
+            df_categoria = df_filtrado[df_filtrado["Categoría"] == categoria_sel]
+
+        # Dropdown de productos según la categoría seleccionada
+        productos = sorted(df_categoria["Producto"].dropna().unique())
+        producto_sel = st.selectbox("Producto", ["- Todos -"] + productos)
+
+        # Filtrar según producto seleccionado
+        if producto_sel == "- Todos -":
+            df_p = df_categoria
+        else:
+            df_p = df_categoria[df_categoria["Producto"] == producto_sel]
+
+        # Mostrar métricas
         st.metric("Total vendido", int(df_p["Cantidad"].sum()))
 
+        # Gráfico de evolución de ventas
         chart = alt.Chart(df_p).mark_line(point=True, color="#8e59ff").encode(
             x=alt.X("Fecha:T", axis=alt.Axis(format="%Y-%m-%d")),
             y="Cantidad:Q",
@@ -224,7 +241,9 @@ elif menu == "📦 Productos":
         )
         st.altair_chart(chart, use_container_width=True)
 
+        # Tabla
         show_df_without_time(df_p)
+
 
 # ================================
 # 7) VENTAS
