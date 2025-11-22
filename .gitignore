@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VSCode settings
+.vscode/
+
+# Streamlit cache & temp
+.streamlit/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Secrets (no subir el JSON ni archivos privados)
+service_account.json
+
+# Logs
+*.log
