@@ -57,7 +57,7 @@ def load_data():
 
     sh = client.open("pedidos_darla")
 
-    # 🎯 NUEVO: detectar año actual y abrir esa pestaña
+    # 🎯 Detectar año actual y abrir esa pestaña
     current_year = str(datetime.now().year)
     ws = sh.worksheet(current_year)
 
@@ -68,6 +68,15 @@ def load_data():
     return df
 
 df = load_data()
+
+# ==========================================
+# 🔧 CORRECCIÓN NUMÉRICA → DIVIDIR ENTRE 100
+# ==========================================
+df["Cantidad"] = df["Cantidad"].astype(float) / 100
+df["Precio"] = df["Precio"].astype(float) / 100
+df["Total"] = df["Total"].astype(float) / 100
+# (opcional) si la hoja trae cantidad mal formateada:
+# df["Cantidad"] = df["Cantidad"].astype(float)
 
 st.title("📊 Dashboard de Ventas")
 
@@ -139,9 +148,12 @@ if menu == "🏠 Dashboard General":
     if df_filtrado.empty:
         st.warning("No hay datos para el rango seleccionado.")
     else:
+        # Mostrar total consumido
+        total_consumido = df_filtrado["Total"].sum()
+        st.metric("💰 Total consumido", f"S/ {total_consumido:.2f}")
+
         col1, col2 = st.columns(2)
 
-        # 1. Ventas por cliente
         with col1:
             st.markdown("### 💰 Ventas por Cliente")
             df_cliente = df_filtrado.groupby("Cliente", as_index=False)["Total"].sum()
@@ -150,25 +162,24 @@ if menu == "🏠 Dashboard General":
                 alt.Chart(df_cliente)
                 .mark_bar()
                 .encode(
-                    x=alt.X("Cliente:N", sort="-y"),
-                    y="Total:Q",
+                    y=alt.Y("Cliente:N", sort="-x"),
+                    x="Total:Q",
                     tooltip=["Cliente", "Total"]
                 )
             )
             st.altair_chart(chart, use_container_width=True)
 
-        # 2. Productos más vendidos (rosado)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
-            df_prod = df_filtrado.groupby("Producto", as_index=False)["Cantidad"].sum()
+            df_prod = df_filtrado.groupby("Producto", as_index=False)["Total"].sum()
 
             chart2 = (
                 alt.Chart(df_prod)
-                .mark_bar(color="#ff6fbf")   # rosado
+                .mark_bar(color="#ff6fbf")
                 .encode(
-                    x=alt.X("Producto:N", sort="-y"),
-                    y="Cantidad:Q",
-                    tooltip=["Producto", "Cantidad"]
+                    y=alt.Y("Producto:N", sort="-x"),
+                    x="Total:Q",
+                    tooltip=["Producto", "Total"]
                 )
             )
             st.altair_chart(chart2, use_container_width=True)
@@ -178,23 +189,21 @@ if menu == "🏠 Dashboard General":
 # ================================
 elif menu == "👥 Clientes":
     st.subheader("👥 Análisis por Cliente")
-
     clientes = sorted(df["Cliente"].dropna().unique())
     cliente_sel = st.selectbox("Selecciona un cliente", ["- Todos -"] + clientes)
-
+    
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
         df_c = df_filtrado if cliente_sel == "- Todos -" else df_filtrado[df_filtrado["Cliente"] == cliente_sel]
-
         st.metric("Total consumido", f"S/ {df_c['Total'].sum():.2f}")
 
-        df_prod = df_c.groupby("Producto", as_index=False)["Cantidad"].sum()
+        df_prod = df_c.groupby("Producto", as_index=False)["Total"].sum()
 
         chart = alt.Chart(df_prod).mark_bar(color="#80c683").encode(
-            x=alt.X("Producto:N", sort="-y"),
-            y="Cantidad:Q",
-            tooltip=["Producto", "Cantidad"]
+            y=alt.Y("Producto:N", sort="-x"),
+            x="Total:Q",
+            tooltip=["Producto", "Total"]
         )
         st.altair_chart(chart, use_container_width=True)
 
@@ -202,7 +211,7 @@ elif menu == "👥 Clientes":
         show_df_without_time(df_c)
 
 # ================================
-# 6) PRODUCTOS (con 2 dropdown relacionados)
+# 6) PRODUCTOS
 # ================================
 elif menu == "📦 Productos":
     st.subheader("📦 Análisis por Producto")
@@ -210,30 +219,18 @@ elif menu == "📦 Productos":
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
-        # 🟢 Crear lista de categorías únicas de la pestaña filtrada
         categorias = sorted(df_filtrado["Categoría"].dropna().unique())
         categoria_sel = st.selectbox("Categoría", ["- Todas -"] + categorias)
 
-        # Filtrar productos según la categoría seleccionada
-        if categoria_sel == "- Todas -":
-            df_categoria = df_filtrado
-        else:
-            df_categoria = df_filtrado[df_filtrado["Categoría"] == categoria_sel]
+        df_categoria = df_filtrado if categoria_sel == "- Todas -" else df_filtrado[df_filtrado["Categoría"] == categoria_sel]
 
-        # Dropdown de productos según la categoría seleccionada
         productos = sorted(df_categoria["Producto"].dropna().unique())
         producto_sel = st.selectbox("Producto", ["- Todos -"] + productos)
 
-        # Filtrar según producto seleccionado
-        if producto_sel == "- Todos -":
-            df_p = df_categoria
-        else:
-            df_p = df_categoria[df_categoria["Producto"] == producto_sel]
+        df_p = df_categoria if producto_sel == "- Todos -" else df_categoria[df_categoria["Producto"] == producto_sel]
 
-        # Mostrar métricas
         st.metric("Total vendido", int(df_p["Cantidad"].sum()))
 
-        # Gráfico de evolución de ventas
         chart = alt.Chart(df_p).mark_line(point=True, color="#8e59ff").encode(
             x=alt.X("Fecha:T", axis=alt.Axis(format="%Y-%m-%d")),
             y="Cantidad:Q",
@@ -241,9 +238,7 @@ elif menu == "📦 Productos":
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # Tabla
         show_df_without_time(df_p)
-
 
 # ================================
 # 7) VENTAS

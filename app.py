@@ -64,6 +64,17 @@ def load_data():
     return df
 
 df = load_data()
+
+# ==========================================
+# 🔧 CORRECCIÓN NUMÉRICA → DIVIDIR ENTRE 100
+# ==========================================
+df["Cantidad"] = df["Cantidad"].astype(float) / 100
+df["Precio"] = df["Precio"].astype(float) / 100
+df["Total"] = df["Total"].astype(float) / 100
+# (opcional) si la hoja trae cantidad mal formateada:
+# df["Cantidad"] = df["Cantidad"].astype(float)
+
+
 st.title("📊 Dashboard de Ventas")
 
 # ==========================================
