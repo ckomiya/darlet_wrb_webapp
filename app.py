@@ -117,32 +117,52 @@ def show_df_without_time(df_to_show):
     st.dataframe(tmp)
 
 # ================================
-# 4) DASHBOARD GENERAL
+# 4) Dashboard General
 # ================================
 if menu == "🏠 Dashboard General":
     st.subheader("🏠 Dashboard General")
+
     if df_filtrado.empty:
         st.warning("No hay datos para el rango seleccionado.")
     else:
+        # Mostrar total consumido
+        total_consumido = df_filtrado["Total"].sum()
+        st.metric("💰 Total consumido", f"S/ {total_consumido:.2f}")
+
         col1, col2 = st.columns(2)
+
+        # 1. Ventas por cliente (ejes invertidos)
         with col1:
             st.markdown("### 💰 Ventas por Cliente")
             df_cliente = df_filtrado.groupby("Cliente", as_index=False)["Total"].sum()
-            chart = alt.Chart(df_cliente).mark_bar().encode(
-                x=alt.X("Cliente:N", sort="-y"),
-                y="Total:Q",
-                tooltip=["Cliente", "Total"]
+
+            chart = (
+                alt.Chart(df_cliente)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Cliente:N", sort="-x"),  # eje vertical nominal
+                    x="Total:Q",                      # eje horizontal cuantitativo
+                    tooltip=["Cliente", "Total"]
+                )
             )
             st.altair_chart(chart, use_container_width=True)
+
+        # 2. Productos más vendidos (rosado, ejes invertidos)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
-            df_prod = df_filtrado.groupby("Producto", as_index=False)["Cantidad"].sum()
-            chart2 = alt.Chart(df_prod).mark_bar(color="#ff6fbf").encode(
-                x=alt.X("Producto:N", sort="-y"),
-                y="Cantidad:Q",
-                tooltip=["Producto", "Cantidad"]
+            df_prod = df_filtrado.groupby("Producto", as_index=False)["Total"].sum()  # usar Total
+
+            chart2 = (
+                alt.Chart(df_prod)
+                .mark_bar(color="#ff6fbf")   # rosado
+                .encode(
+                    y=alt.Y("Producto:N", sort="-x"),  # eje vertical nominal
+                    x="Total:Q",                        # eje horizontal cuantitativo
+                    tooltip=["Producto", "Total"]
+                )
             )
             st.altair_chart(chart2, use_container_width=True)
+
 
 # ================================
 # 5) CLIENTES
@@ -151,18 +171,23 @@ elif menu == "👥 Clientes":
     st.subheader("👥 Análisis por Cliente")
     clientes = sorted(df["Cliente"].dropna().unique())
     cliente_sel = st.selectbox("Selecciona un cliente", ["- Todos -"] + clientes)
+    
     if df_filtrado.empty:
         st.warning("No hay datos.")
     else:
         df_c = df_filtrado if cliente_sel == "- Todos -" else df_filtrado[df_filtrado["Cliente"] == cliente_sel]
         st.metric("Total consumido", f"S/ {df_c['Total'].sum():.2f}")
-        df_prod = df_c.groupby("Producto", as_index=False)["Cantidad"].sum()
+
+        # Agrupar por Producto y sumar Total
+        df_prod = df_c.groupby("Producto", as_index=False)["Total"].sum()
+
         chart = alt.Chart(df_prod).mark_bar(color="#80c683").encode(
-            x=alt.X("Producto:N", sort="-y"),
-            y="Cantidad:Q",
-            tooltip=["Producto", "Cantidad"]
+            y=alt.Y("Producto:N", sort="-x"),  # categorías en Y
+            x="Total:Q",                        # ahora valores en X = Total
+            tooltip=["Producto", "Total"]
         )
         st.altair_chart(chart, use_container_width=True)
+
         st.markdown("### 📋 Detalle")
         show_df_without_time(df_c)
 

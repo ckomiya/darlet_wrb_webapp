@@ -154,6 +154,7 @@ if menu == "🏠 Dashboard General":
 
         col1, col2 = st.columns(2)
 
+        # 1. Ventas por cliente (ejes invertidos)
         with col1:
             st.markdown("### 💰 Ventas por Cliente")
             df_cliente = df_filtrado.groupby("Cliente", as_index=False)["Total"].sum()
@@ -162,27 +163,30 @@ if menu == "🏠 Dashboard General":
                 alt.Chart(df_cliente)
                 .mark_bar()
                 .encode(
-                    y=alt.Y("Cliente:N", sort="-x"),
-                    x="Total:Q",
+                    y=alt.Y("Cliente:N", sort="-x"),  # eje vertical nominal
+                    x="Total:Q",                      # eje horizontal cuantitativo
                     tooltip=["Cliente", "Total"]
                 )
             )
             st.altair_chart(chart, use_container_width=True)
 
+        # 2. Productos más vendidos (rosado, ejes invertidos)
         with col2:
             st.markdown("### 📦 Productos más vendidos")
-            df_prod = df_filtrado.groupby("Producto", as_index=False)["Total"].sum()
+            df_prod = df_filtrado.groupby("Producto", as_index=False)["Total"].sum()  # usar Total
 
             chart2 = (
                 alt.Chart(df_prod)
                 .mark_bar(color="#ff6fbf")
                 .encode(
-                    y=alt.Y("Producto:N", sort="-x"),
-                    x="Total:Q",
+                    y=alt.Y("Producto:N", sort="-x"),  # eje vertical nominal
+                    x="Total:Q",                        # eje horizontal cuantitativo
                     tooltip=["Producto", "Total"]
                 )
             )
             st.altair_chart(chart2, use_container_width=True)
+
+
 
 # ================================
 # 5) CLIENTES
@@ -198,11 +202,12 @@ elif menu == "👥 Clientes":
         df_c = df_filtrado if cliente_sel == "- Todos -" else df_filtrado[df_filtrado["Cliente"] == cliente_sel]
         st.metric("Total consumido", f"S/ {df_c['Total'].sum():.2f}")
 
+        # Agrupar por Producto y sumar Total
         df_prod = df_c.groupby("Producto", as_index=False)["Total"].sum()
 
         chart = alt.Chart(df_prod).mark_bar(color="#80c683").encode(
-            y=alt.Y("Producto:N", sort="-x"),
-            x="Total:Q",
+            y=alt.Y("Producto:N", sort="-x"),  # categorías en Y
+            x="Total:Q",                        # ahora valores en X = Total
             tooltip=["Producto", "Total"]
         )
         st.altair_chart(chart, use_container_width=True)
